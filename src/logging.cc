@@ -16,7 +16,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#if defined(__APPLE__) || defined(__OSX__)
+#include <sys/syscall.h>
+#elif defined(__LINUX__)
 #include <syscall.h>
+#endif
 #include <sys/time.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -26,6 +30,7 @@
 #include "mutex.h"
 #include "thread.h"
 #include "timer.h"
+
 
 namespace baidu {
 namespace common {
@@ -290,7 +295,14 @@ void Logv(int log_level, const char* format, va_list ap) {
     static __thread char tid_str[32];
     static __thread int tid_str_len = 0;
     if (thread_id == 0) {
+    #if defined(__APPLE__) || defined(__OSX__)
+        thread_id = syscall(SYS_thread_selfid);
+    #elif defined(__LINUX__)
+        #ifndef __NR_gettid
+        #define __NR_gettid 224
+        #endif
         thread_id = syscall(__NR_gettid);
+    #endif
         tid_str_len = snprintf(tid_str, sizeof(tid_str), " %5d ", static_cast<int32_t>(thread_id));
     }
 
