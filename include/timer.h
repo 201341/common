@@ -63,6 +63,27 @@ static inline int32_t now_time_str(char* buf, int32_t len, Precision p = kUsec) 
     return ret;
 }
 
+inline void timespec_normalize(timespec* tm) {
+    if (tm->tv_nsec >= 1000000000L) {
+        const int64_t added_sec = tm->tv_nsec / 1000000000L;
+        tm->tv_sec += added_sec;
+        tm->tv_nsec -= added_sec * 1000000000L;
+    } else if (tm->tv_nsec < 0) {
+        const int64_t sub_sec = (tm->tv_nsec - 999999999L) / 1000000000L;
+        tm->tv_sec += sub_sec;
+        tm->tv_nsec -= sub_sec * 1000000000L;
+    }
+}
+
+inline timespec timespec_from_now(const timespec& span) {
+    timespec time;
+    clock_gettime(CLOCK_REALTIME, &time);
+    time.tv_sec += span.tv_sec;
+    time.tv_nsec += span.tv_nsec;
+    timespec_normalize(&time);
+    return time;
+}
+
 class AutoTimer {
 public:
     AutoTimer(double timeout_ms = -1, const char* msg1 = NULL, const char* msg2 = NULL)

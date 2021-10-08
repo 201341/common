@@ -5,18 +5,17 @@
 
 #include "rw_lock_impl.h"
 
-#include <syscall.h>
-#include <linux/futex.h>
 #include <limits.h>
 #include <unistd.h>
 #include <assert.h>
 
+#include "sys_futex.h"
 #include "mutex.h"
 
-static inline int sys_futex(void *futex, int op, int val,
-                            const struct timespec *timeout) {
-    return syscall(__NR_futex, op, val, timeout);
-}
+// static inline int sys_futex(void *futex, int op, int val,
+//                             const struct timespec *timeout) {
+//     return syscall(__NR_futex, op, val, timeout);
+// }
 
 namespace baidu {
 namespace common {
@@ -38,7 +37,7 @@ int RWLockImpl::ReadLock() {
         readers_queue_size_++;
         int wait_val = readers_wakeup_;
         mu_.Unlock();
-        sys_futex(&readers_wakeup_, FUTEX_WAIT, wait_val, NULL);
+        futex_wait_private(&readers_wakeup_, wait_val, NULL);
         mu_.Lock();
         readers_queue_size_--;
     }
@@ -59,7 +58,7 @@ int RWLockImpl::WriteLock() {
         writers_queue_size_++;
         int wait_val = writer_wakeup_;
         mu_.Unlock();
-        sys_futex(&writer_wakeup_, FUTEX_WAIT, wait_val, NULL);
+        futex_wait_private(&writer_wakeup_, wait_val, NULL); 
         mu_.Lock();
         writers_queue_size_--;
     }
@@ -81,12 +80,12 @@ int RWLockImpl::Unlock() {
         if (writers_queue_size_) {
             writer_wakeup_++;
             mu_.Unlock();
-            sys_futex(&writer_wakeup_, FUTEX_WAKE, 1, NULL);
+            futex_wake_private(&writer_wakeup_, 1);
             return 0;
         } else if (readers_queue_size_) {
             readers_wakeup_++;
             mu_.Unlock();
-            sys_futex(&readers_wakeup_, FUTEX_WAKE, INT_MAX, NULL);
+            futex_wake_private(&readers_wakeup_, INT_MAX);
             return 0;
         }
     }
